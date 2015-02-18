@@ -90,15 +90,17 @@ class PixivArtist:
 
     def ParseImages(self, page):
         del self.imageList[:]
-        temp = page.find(attrs={'class':'display_works linkStyleWorks '}).ul
+        temp = page.find('ul', attrs={'class':'_image-items'})
         temp = temp.findAll('a')
         if temp == None or len(temp) == 0:
             raise PixivException('No image found!', errorCode=PixivException.NO_IMAGES)
         for item in temp:
             href = re.search('member_illust.php.*illust_id=(\d+)', str(item))
             if href != None:
-                href = href.group(1)
-                self.imageList.append(int(href))
+                href = int(href.group(1))
+                # fuck performance :D
+                if href not in self.imageList:
+                    self.imageList.append(href)
 
     def IsNotLoggedIn(self, page):
         check = page.findAll('a', attrs={'class':'signup_button'})
@@ -197,7 +199,7 @@ class PixivImage:
             if self.IsGuroDisabled(page):
                 raise PixivException('Image is disabled for under 18, check your setting page (R-18/R-18G)!', errorCode=PixivException.R_18_DISABLED)
 
-            # check if there is any other error
+            ## check if there is any other error
             if self.IsErrorPage(page):
                 raise PixivException('An error occurred!', errorCode=PixivException.OTHER_IMAGE_ERROR)
 
@@ -244,12 +246,15 @@ class PixivImage:
 
     def IsNeedPermission(self, page):
         errorMessages = ['この作品は.+さんのマイピクにのみ公開されています|この作品は、.+さんのマイピクにのみ公開されています',
-                         'This work is viewable only for users who are in .+\'s My pixiv list']
+                         'This work is viewable only for users who are in .+\'s My pixiv list',
+                         'Only .+\'s My pixiv list can view this.',
+                         '<section class="restricted-content">']
         return PixivHelper.HaveStrings(page, errorMessages)
 
     def IsDeleted(self, page):
         errorMessages = ['該当イラストは削除されたか、存在しないイラストIDです。|該当作品は削除されたか、存在しない作品IDです。',
-                         'The following work is either deleted, or the ID does not exist.']
+                         'The following work is either deleted, or the ID does not exist.',
+                         'This work was deleted.']
         return PixivHelper.HaveStrings(page, errorMessages)
 
     def IsGuroDisabled(self, page):
@@ -276,15 +281,21 @@ class PixivImage:
         return None
 
     def ParseInfo(self, page):
+        temp = None
         links = page.find(attrs={'class':'works_display'}).findAll('a')
         for a in links:
             if re.search('illust_id=(\d+)',a['href']) is not None:
                 temp = str(a['href'])
                 break
 
-        temp_id = int(re.search('illust_id=(\d+)',temp).group(1))
-        assert temp_id == self.imageId, "Invalid Id detected ==> %i != %i" % (temp_id, self.imageId)
-        self.imageMode = re.search('mode=(big|manga|ugoira_view)',temp).group(1)
+        if temp is None:
+            # changes on pixiv website to handle big image
+            self.imageMode = "bigNew"
+
+        else :
+            temp_id = int(re.search('illust_id=(\d+)',temp).group(1))
+            assert temp_id == self.imageId, "Invalid Id detected ==> %i != %i" % (temp_id, self.imageId)
+            self.imageMode = re.search('mode=(big|manga|ugoira_view)',temp).group(1)
 
         # remove premium-introduction-modal so we can get caption from work-info
         # somehow selecting section doesn't works
@@ -356,17 +367,17 @@ class PixivImage:
         PixivHelper.safePrint( 'Tools : ' + self.worksTools)
         return ""
 
-    def ParseImages(self, page, mode=None):
+    def ParseImages(self, page, mode=None, _br=None):
         if page == None:
             raise PixivException('No page given', errorCode = PixivException.NO_PAGE_GIVEN)
         if mode == None:
             mode = self.imageMode
 
         del self.imageUrls[:]
-        if mode == 'big':
+        if mode == 'big' or mode == 'bigNew':
             self.imageUrls.append(self.ParseBigImages(page))
         elif mode == 'manga':
-            self.imageUrls = self.ParseMangaImages(page)
+            self.imageUrls = self.CheckMangaType(page, _br)
         elif mode == 'ugoira_view':
             self.imageUrls.append(self.ParseUgoira(page))
         if len(self.imageUrls) == 0:
@@ -374,8 +385,20 @@ class PixivImage:
         return self.imageUrls
 
     def ParseBigImages(self, page):
-        temp = page.find('img')['src']
         self.imageCount = 1
+
+        # new layout for big 20141216
+        temp = page.find('img', attrs={'class': 'original-image'})
+        if temp is not None:
+            return str(temp['data-src'])
+
+        # new layout for big 20141212
+        temp = page.find('img', attrs={'class': 'big'})
+        if temp is not None:
+            return str(temp['data-src'])
+
+        # old layout
+        temp = page.find('img')['src']
         return str(temp)
 
     def ParseUgoira(self, page):
@@ -392,33 +415,66 @@ class PixivImage:
                         self.imageCount = 1
                         return js["src"]
 
-    def ParseMangaImages(self, page):
+    def CheckMangaType(self, page, _br):
+        # _book-viewer
+        twopage_format = page.find("html", attrs={'class': re.compile(r".*\b_book-viewer\b.*")})
+        if twopage_format is not None and len(twopage_format) > 0:
+            # new format
+            print "2-page manga viewer mode"
+            return self.ParseMangaImagesScript(page)
+        else:
+            # old  format
+            return self.ParseMangaImagesNew(page, _br)
+
+    def ParseMangaImagesScript(self, page):
         urls = []
         scripts = page.findAll('script')
-        string = ''
+        pattern = re.compile("pixiv.context.originalImages\[\d+\].*(http.*)\"")
         for script in scripts:
-            string += str(script)
-        # normal: http://img04.pixiv.net/img/xxxx/12345_p0.jpg
-        # mypick: http://img04.pixiv.net/img/xxxx/12344_5baa86aaad_p0.jpg
-        pattern = re.compile('http.*?(?<!mobile)\d+[_0-9a-z_]*_p\d+\..{3}')
-        pattern2 = re.compile('http.*?(?<!mobile)(\d+[_0-9a-z_]*_p\d+)\..{3}')
-        m = pattern.findall(string)
+            s = str(script)
+            if "pixiv.context.originalImages" in s:
+                # <script>pixiv.context.images[10] = "http:\/\/i2.pixiv.net\/c\/1200x1200\/img-master\/img\/2014\/10\/03\/14\/13\/59\/46322053_p10_master1200.jpg";pixiv.context.thumbnailImages[10] = "http:\/\/i2.pixiv.net\/c\/128x128\/img-master\/img\/2014\/10\/03\/14\/13\/59\/46322053_p10_square1200.jpg";pixiv.context.originalImages[10] = "http:\/\/i2.pixiv.net\/img-original\/img\/2014\/10\/03\/14\/13\/59\/46322053_p10.jpg";</script>
+                m = pattern.findall(s)
+                if len(m) > 0:
+                    # http:\\/\\/i2.pixiv.net\\/img-original\\/img\\/2014\\/10\\/03\\/14\\/13\\/59\\/46322053_p0.jpg
+                    img = m[0].replace('\\/', "/")
+                    urls.append(img)
 
-        # filter mobile thumb: http://i1.pixiv.net/img01/img/sokusekimaou/mobile/20592252_128x128_p8.jpg
-        m2 = []
-        for img in m:
-            if img.find('/mobile/') == -1:
-                m2.append(img)
-        m = m2
+        self.imageCount = len(urls)
+        return urls
 
-        self.imageCount = len(m)
-        for img in m:
-            temp = str(img)
-            m2 = pattern2.findall(temp)         ## 1234_p0
-            temp = temp.replace(m2[0], m2[0].replace('_p', '_big_p'))
-            urls.append(temp)
-            temp = str(img)
-            urls.append(temp)
+    def ParseMangaImagesNew(self, page, _br):
+        urls = []
+        mangaSection = page.find("section", attrs={'class':'manga'})
+        links = mangaSection.findAll('a')
+        ## /member_illust.php?mode=manga_big&illust_id=46279245&page=0
+        if _br is None:
+            import PixivBrowserFactory
+            _br = PixivBrowserFactory.getExistingBrowser()
+
+        for link in links:
+            try:
+                href = _br.fixUrl(link["href"])
+                print "Fetching big image page:", href
+                bigPage = _br.getPixivPage(url=href, referer = "http://www.pixiv.net/member_illust.php?mode=manga&illust_id=" + str(self.imageId))
+
+                bigImg = bigPage.find('img')
+                imgUrl = bigImg["src"]
+                print "Found: ", imgUrl
+                urls.append(imgUrl)
+                bigImg.decompose()
+                bigPage.decompose()
+                del bigImg
+                del bigPage
+            except Exception as ex:
+                print ex
+
+        total = page.find("span", attrs={'class':'total'})
+        if total is not None:
+            self.imageCount = int(total.string)
+            if self.imageCount != len(urls):
+                raise PixivException("Different images count: " + str(self.imageCount) + " != " + str(len(urls)))
+
         return urls
 
     def ParseBookmarkDetails(self, page):
@@ -567,10 +623,13 @@ class PixivNewIllustBookmark:
             for r in result:
                 href = re.search('member_illust.php?.*illust_id=(\d+)', r['href'])
                 if href != None:
-                    href = href.group(1)
-                    self.imageList.append(int(href))
+                    href = int(href.group(1))
+                    # fuck performance :D
+                    if href not in self.imageList:
+                        self.imageList.append(href)
         except:
             pass
+
         return self.imageList
 
     def __CheckLastPage(self, page):
@@ -612,7 +671,7 @@ class PixivBookmark:
     @staticmethod
     def parseImageBookmark(page):
         imageList = list()
-        temp = page.find(attrs={'class':'display_works linkStyleWorks display_editable_works'}).ul
+        temp = page.find('ul', attrs={'class':'_image-items'})
         temp = temp.findAll('a')
         if temp == None or len(temp) == 0:
             return imageList
@@ -671,8 +730,9 @@ class PixivTags:
         for item in items:
             if str(item).find('member_illust.php?') > -1:
                 image_id = __re_illust.findall(item.find('a')['href'])[0]
-                if image_id in ignore:
+                if not str(image_id).isdigit() or image_id in ignore:
                     continue
+
                 bookmarkCount = 0
                 imageResponse = 0
                 countList = item.find('ul', attrs={'class':'count-list'})

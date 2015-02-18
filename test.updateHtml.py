@@ -21,13 +21,13 @@ def prepare():
 
     result = False
     if len(__config__.cookie) > 0:
-        result = PixivUtil2.pixiv_login_cookie()
+        result = __br__.loginUsingCookie(__config__.cookie)
 
     if not result:
         if __config__.useSSL:
-            result = PixivUtil2.pixiv_login_ssl(username,password)
+            result = __br__.loginHttps(username,password)
         else:
-            result = PixivUtil2.pixiv_login(username,password)
+            result = __br__.loginHttp(username,password)
 
     return result
 
@@ -75,23 +75,33 @@ def main():
         downloadPage('http://www.pixiv.net/member_illust.php?mode=medium&illust_id=9175987', './test/test-image-no_tags.htm')
         downloadPage('http://www.pixiv.net/member_illust.php?mode=medium&illust_id=28865189', './test/test-image-rate_count.htm')
         ## downloadPage('http://www.pixiv.net/member_illust.php?mode=big&illust_id=20644633', './test/test-image-parsebig.htm')
-        downloadPage('http://www.pixiv.net/member_illust.php?mode=manga&illust_id=20592252', './test/test-image-parsemanga.htm')
-        downloadPage('http://www.pixiv.net/member_illust.php?mode=manga&illust_id=44301046', './test/test-image-ugoira.htm')
+        downloadPage('http://www.pixiv.net/member_illust.php?mode=manga&illust_id=46279245', './test/test-image-parsemanga.htm')
+        downloadPage('http://www.pixiv.net/member_illust.php?mode=medium&illust_id=46281014', './test/test-image-ugoira.htm')
+        downloadPage('http://www.pixiv.net/member_illust.php?mode=manga&illust_id=46322053', './test/test-image-manga-2page.htm')
+        downloadPage('http://www.pixiv.net/member_illust.php?mode=medium&illust_id=28688383', './test/test-image-deleted.htm')
 
         downloadPage('http://www.pixiv.net/bookmark.php', './test/test-image-bookmark.htm')
 
-        downloadPage('http://www.pixiv.net/member_illust.php?id=313631&p=4', './test/test-tags-member-search-last.htm')
+        downloadPage('http://www.pixiv.net/member_illust.php?id=313631&p=5', './test/test-tags-member-search-last.htm')
         downloadPage('http://www.pixiv.net/search.php?word=%E5%88%9D%E6%98%A5%E9%A3%BE%E5%88%A9&s_mode=s_tag_full', './test/test-tags-search-exact.htm')
         downloadPage('http://www.pixiv.net/search.php?word=%E3%81%93%E3%81%AE%E4%B8%AD%E3%81%AB1%E4%BA%BA%E3%80%81%E5%A6%B9%E3%81%8C%E3%81%84%E3%82%8B!&s_mode=s_tag_full&order=date_d&p=12', './test/test-tags-search-partial.htm')
         downloadPage('http://www.pixiv.net/search.php?s_mode=s_tag_full&word=XXXXXX','./test/test-tags-search-exact-parse_details.htm')
         downloadPage('http://www.pixiv.net/search.php?s_mode=s_tag&word=%E3%81%93%E3%81%AE%E4%B8%AD%E3%81%AB1%E4%BA%BA%E3%80%81%E5%A6%B9%E3%81%8C%E3%81%84%E3%82%8B!','./test/test-tags-search-partial.htm')
-        downloadPage('http://www.pixiv.net/search.php?word=%E3%81%93%E3%81%AE%E4%B8%AD%E3%81%AB1%E4%BA%BA%E3%80%81%E5%A6%B9%E3%81%8C%E3%81%84%E3%82%8B!&order=date_d&p=12','./test/test-tags-search-partial-last.htm')
+        downloadPage('http://www.pixiv.net/search.php?word=%E3%81%93%E3%81%AE%E4%B8%AD%E3%81%AB1%E4%BA%BA%E3%80%81%E5%A6%B9%E3%81%8C%E3%81%84%E3%82%8B!&order=date_d&p=11','./test/test-tags-search-partial-last.htm')
 
         downloadPage('http://www.pixiv.net/search.php?s_mode=s_tag&word=R-18%20K-On!','./test/test-tags-search-skip-showcase.htm')
+
+        downloadPage('http://www.pixiv.net/search.php?word=%E3%82%AF%E3%83%89%E3%83%AA%E3%83%A3%E3%83%95%E3%82%AB&s_mode=s_tag_full','./test/test-tags-search-exact2.htm')
         ## Not updated:
         ## ./test/test-login-error.htm
         ## ./test/test-member-suspended.htm
         ## ./test/test-member-nologin.htm
 
+        print "Completed"
+
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as ex:
+        print ex
+    raw_input("anykey")

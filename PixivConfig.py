@@ -15,6 +15,8 @@ script_path = PixivHelper.module_path()
 class PixivConfig:
     '''Configuration class'''
     __logger = PixivHelper.GetLogger()
+    configFileLocation = "config.ini"
+
     ## default value
     proxyAddress = ''
     proxy = {'http': proxyAddress, 'https': proxyAddress, }
@@ -23,7 +25,7 @@ class PixivConfig:
     username = ''
     password = ''
 
-    useragent = 'Mozilla/5.0 (X11; U; Unix i686; en-US; rv:1.9.0.1) Gecko/2008071615 Fedora/3.0.1-1.fc9 Firefox/3.0.1'
+    useragent = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2062.124 Safari/537.36'
     debugHttp = False
 
     numberOfPage = 0
@@ -76,16 +78,16 @@ class PixivConfig:
 
     def loadConfig(self, path=None):
         if path != None:
-            configFile = path
+            self.configFileLocation = path
         else:
-            configFile = script_path + os.sep + 'config.ini'
+            self.configFileLocation = script_path + os.sep + 'config.ini'
 
-        print 'Reading', configFile, '...'
+        print 'Reading', self.configFileLocation, '...'
         oldSetting = False
         haveError = False
         config = ConfigParser.RawConfigParser()
         try:
-            config.readfp(PixivHelper.OpenTextFile(configFile))
+            config.readfp(PixivHelper.OpenTextFile(self.configFileLocation))
 
             self.username = config.get('Authentication','username')
 
@@ -430,6 +432,7 @@ class PixivConfig:
         config.set('Settings', 'enableDump', self.enableDump)
         config.set('Settings', 'skipDumpFilter', self.skipDumpFilter)
         config.set('Settings', 'dumpMediumPage', self.dumpMediumPage)
+        config.set('Settings', 'writeUgoiraInfo', self.writeUgoiraInfo)
 
         config.set('Authentication', 'username', self.username)
         config.set('Authentication', 'password', self.password)
@@ -510,6 +513,7 @@ class PixivConfig:
         print ' - enableDump       =', self.enableDump
         print ' - skipDumpFilter   =', self.skipDumpFilter
         print ' - dumpMediumPage   =', self.dumpMediumPage
+        print ' - writeUgoiraInfo  =', self.writeUgoiraInfo
 
         print ' [Pixiv]'
         print ' - numberOfPage =', self.numberOfPage

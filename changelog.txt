@@ -1,3 +1,39 @@
+20150218:
+- Fix Issue #64: Update login form selector.
+
+20150121:
+- Implement #66: Add option to download from oldest image first for Download by Tags/Tags list.
+
+20150105:
+- Update the SSL login page url to https://www.secure.pixiv.net/login.php.
+- Update BeautifulSoup to version 3.2.1.
+
+20141216:
+- Fix Issue #63: Update image parser again :(.
+
+20141212b:
+- Fix Issue #60: Update image parser to handle old and new layout.
+- Fix html dump logic.
+
+20141201:
+- Fix Issue #58: Update handler for private image.
+- Update handler for deleted image.
+
+20141121:
+- Fix issue #57: Type error when downloading from tags.
+
+20141006:
+- Ignore userobots setting, now is set to always False.
+- Update manga parser again.
+
+20141004c:
+- Update parser.
+- Update download logic for manga page (20141004b)
+- Update parser for the new 2 page manga mode (20141004c)
+
+20140926
+- Fix Issue #47: Update manga parser.
+
 20140916
 - Fix Issue #44: process image to handle known image exception.
 - Implement #43: write ugoira data to separate file.

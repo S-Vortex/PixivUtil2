@@ -1,11 +1,24 @@
 ﻿#!/c/Python27/python.exe
 # -*- coding: UTF-8 -*-
 from PixivModel import PixivArtist, PixivImage, PixivBookmark,PixivNewIllustBookmark, PixivTags, PixivGroup
+from PixivBrowserFactory import PixivBrowser
 from PixivException import PixivException
 from BeautifulSoup import BeautifulSoup
 from mechanize import Browser
 import os
 import unittest
+
+class MockPixivBrowser(PixivBrowser):
+    def __init__(self):
+        pass
+
+    def getPixivPage(self, url, referer="http://www.pixiv.net", errorPageName=None):
+        ''' fake the manga page '''
+        pageNo = url.split("=")[-1]
+        p = open('./test/test-image-parsemanga-big-'+pageNo+'.htm', 'r')
+        page = BeautifulSoup(p.read())
+        return page
+
 
 class TestPixivArtist(unittest.TestCase):
     def testPixivArtistProfileDataSrc(self):
@@ -116,7 +129,7 @@ class TestPixivImage(unittest.TestCase):
       self.assertTrue(u'なにこれかわいい' in image2.imageTags)
       self.assertTrue(u'やはり存在する斧' in image2.imageTags)
 
-      self.assertEqual(image2.imageMode, "big")
+      self.assertEqual(image2.imageMode, "bigNew")
       self.assertEqual(image2.worksDate,'12-11-2012 00:23')
       self.assertEqual(image2.worksResolution,'642x900')
       self.assertEqual(image2.worksTools, 'Photoshop SAI')
@@ -237,7 +250,7 @@ class TestPixivImage(unittest.TestCase):
       del page
       self.assertNotEqual(image, None)
       self.assertEqual(image.imageId, 2493913)
-      self.assertEqual(image.imageMode, 'big')
+      self.assertEqual(image.imageMode, 'bigNew')
       self.assertEqual(image.worksDate,'12-23-2008 21:01')
       self.assertEqual(image.worksResolution,'852x1200')
       #print image.worksTools
@@ -270,6 +283,16 @@ class TestPixivImage(unittest.TestCase):
       page.decompose()
       del page
 
+    def testPixivImageDeleted(self):
+      #print '\nTesting image page - deleted image'
+      p = open('./test/test-image-deleted.htm', 'r')
+      page = BeautifulSoup(p.read())
+      with self.assertRaises(PixivException):
+          PixivImage(123, page)
+      page.decompose()
+      del page
+
+
     def testPixivImageNoImageEng(self):
       #print '\nTesting image page - no image'
       p = open('./test/test-image-noimage-eng.htm', 'r')
@@ -294,28 +317,43 @@ class TestPixivImage(unittest.TestCase):
       self.assertEqual(image.imageId, 28820443)
       self.assertEqual(image.imageMode, 'manga')
 
+    def testPixivImageParseMangaTwoPage(self):
+      #print '\nTesting parse Manga Images'
+      p = open('./test/test-image-manga-2page.htm', 'r')
+      page = BeautifulSoup(p.read())
+      image = PixivImage()
+      urls = image.ParseImages(page, mode='manga')
+      #print urls
+      self.assertEqual(len(urls), 11)
+      self.assertEqual(len(urls), image.imageCount)
+      imageId = urls[0].split('/')[-1].split('.')[0]
+      #print 'imageId:',imageId
+      self.assertEqual(imageId, '46322053_p0')
+
     def testPixivImageParseBig(self):
       #print '\nTesting parse Big Image'
-      p = open('./test/test-image-parsebig.htm', 'r')
+      p = open('./test/test-image-unicode.htm', 'r')
       page = BeautifulSoup(p.read())
       image = PixivImage()
       urls = image.ParseImages(page, mode='big')
       self.assertEqual(len(urls), 1)
+      print urls[0]
       imageId = urls[0].split('/')[-1].split('.')[0]
       #print 'imageId:',imageId
-      self.assertEqual(int(imageId), 20644633)
+      self.assertEqual(int(imageId), 2493913)
 
     def testPixivImageParseManga(self):
       #print '\nTesting parse Manga Images'
       p = open('./test/test-image-parsemanga.htm', 'r')
       page = BeautifulSoup(p.read())
       image = PixivImage()
-      urls = image.ParseImages(page, mode='manga')
+      urls = image.ParseImages(page, mode='manga', _br = MockPixivBrowser())
       #print urls
-      self.assertEqual(len(urls), 39*2)
+      self.assertEqual(len(urls), 3)
+      self.assertEqual(len(urls), image.imageCount)
       imageId = urls[0].split('/')[-1].split('.')[0]
       #print 'imageId:',imageId
-      self.assertEqual(imageId, '20592252_big_p0')
+      self.assertEqual(imageId, '46279245_p0')
 
     def testPixivImageNoLogin(self):
       #print '\nTesting not logged in'
@@ -351,7 +389,7 @@ class TestPixivImage(unittest.TestCase):
       #print '\nTesting image page'
       p = open('./test/test-image-ugoira.htm', 'r')
       page = BeautifulSoup(p.read())
-      image = PixivImage(44301046, page)
+      image = PixivImage(46281014, page)
       urls = image.ParseImages(page)
       print image.imageUrls
       self.assertTrue(image.imageUrls[0].find(".zip") > -1)
@@ -432,7 +470,7 @@ class TestMyPickPage(unittest.TestCase):
 class TestPixivTags(unittest.TestCase):
     def testTagsSearchExact1(self):
         br = Browser()
-        path = 'file:///' + os.path.abspath(u'./test/Error+page+for+search+tags+クドリャフカ.html').replace(os.sep,'/')
+        path = 'file:///' + os.path.abspath(u'./test/test-tags-search-exact2.htm').replace(os.sep,'/')
         p = br.open(path, 'r')
         page = BeautifulSoup(p.read())
         image = PixivTags()
@@ -523,7 +561,7 @@ class TestPixivTags(unittest.TestCase):
         image.parseMemberTags(page)
 
         ##self.assertEqual(len(image.itemList), 10)
-        self.assertEqual(image.itemList[-1].imageId, 1809179)
+        self.assertEqual(image.itemList[-1].imageId, 1804545)
         self.assertEqual(image.isLastPage, True)
 
     def testTagsSkipShowcase(self):
@@ -564,4 +602,5 @@ if __name__ == '__main__':
     print "================================================================"
     suite = unittest.TestLoader().loadTestsFromTestCase(TestPixivGroup)
     unittest.TextTestRunner(verbosity=5).run(suite)
+    raw_input("anykey")
 
